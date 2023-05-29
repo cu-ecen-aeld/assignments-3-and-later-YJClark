@@ -1,6 +1,6 @@
 name: assignment-test
 on: 
-    push:
+    push: 
         tags-ignore:
             - '*'
         branches:
