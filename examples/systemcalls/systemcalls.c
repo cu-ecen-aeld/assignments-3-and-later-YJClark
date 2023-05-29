@@ -1,4 +1,6 @@
 #include "systemcalls.h"
+#include "stdlib.h"
+#include "stdio.h"
 
 /**
  * @param cmd the command to execute with system()
@@ -17,7 +19,12 @@ bool do_system(const char *cmd)
  *   or false() if it returned a failure
 */
 
-    return true;
+    int result = std::system(cmd);
+	if(result == 0){
+		return true;
+	}else{
+		return false;
+	}
 }
 
 /**
@@ -58,6 +65,30 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+  pid_t pid = fork();
+
+  if(pid == -1){
+      perror("fork() failed");
+      return false;
+  }else if(pid == 0){
+      //child process
+      if(execv(command[0], command) == -1){
+          perror("excev failed");
+          exit(EXIT_FAILURE);
+      }
+  }else {  
+      // parent process
+      int status;
+      if(wait(&status) == -1){
+          perror("wait() failed");
+          return false;
+      }
+      if (WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS) {
+          return true;
+      } else {
+          return false;
+      }
+  }
 
     va_end(args);
 
@@ -92,6 +123,37 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+
+    pid_t pid;
+
+    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+    if (fd < 0) { 
+        perror("open"); 
+        return false; 
+    }
+    
+    switch (pid = fork()) {
+    case -1: perror("fork"); abort();
+    case 0:
+        if (dup2(fd, 1) < 0) { perror("dup2"); abort(); }
+        close(fd);
+        execvp(cmd, args); perror("execvp"); abort();
+    default:
+        /* do whatever the parent wants to do. */
+        int status;
+        if (wait(&status) == -1) {
+            perror("wait() failed");
+            close(fd);
+            return false;
+        }
+        if (WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS) {
+            close(fd);
+            return true;
+        } else {
+            close(fd);
+            return false;
+        }
+    }
 
     va_end(args);
 
